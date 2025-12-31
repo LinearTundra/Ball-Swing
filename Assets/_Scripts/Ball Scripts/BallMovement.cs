@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -21,7 +22,11 @@ public class BallMovement : MonoBehaviour
 
     private Vector3 forward = new Vector3(0, 0, 1);
     private float effectStrength;
+    /// <summary>
+    /// true for right, false for left
+    /// </summary>
     private bool effectDirection;
+    private bool hitGround;
 
 
     private void Start()
@@ -33,9 +38,18 @@ public class BallMovement : MonoBehaviour
         Deactivate();
     }
 
+    private void OnCollisionEnter(Collision other)
+    {
+        hitGround = true;
+#if UNITY_EDITOR
+        EditorApplication.isPaused = true;
+#endif
+    }
+
     public void ThrowBall(Vector3 target, BallEffect effect, bool toRight, float effectStrength)
     {
         Throwable = false;
+        hitGround = false;
         this.effectStrength = effectStrength;
         effectDirection = toRight;
         rb.useGravity = true;
@@ -49,7 +63,7 @@ public class BallMovement : MonoBehaviour
 
     private async void SwingBall()
     {
-        while (!HitGround())
+        while (!hitGround)
         {
             AddSwing();
             await Awaitable.FixedUpdateAsync();
@@ -59,7 +73,7 @@ public class BallMovement : MonoBehaviour
 
     private async void SpinBall()
     {
-        while (!HitGround())
+        while (!hitGround)
         {
             await Awaitable.FixedUpdateAsync();
         }
@@ -77,11 +91,6 @@ public class BallMovement : MonoBehaviour
         if (effectDirection) swingVelocity *= -1;
 
         rb.AddForce(swingVelocity, ForceMode.Impulse);
-    }
-
-    private bool HitGround()
-    {
-        return Physics.Raycast(transform.position, Vector3.down, 1.2f, LayerMask.GetMask("Default"));
     }
 
     private async void ResetBall()
@@ -107,7 +116,7 @@ public class BallMovement : MonoBehaviour
         // => 0 = y + 0 - 0.5*9,81*time^2
         //
         // solve for time
-        float deltaY = -startPosition.position.y-.5f;
+        float deltaY = -startPosition.position.y;
 
         // Solve time of flight from vertical motion
         float t = Mathf.Sqrt((2f * deltaY) / g);
@@ -125,7 +134,7 @@ public class BallMovement : MonoBehaviour
 
         // Required initial velocity
         Vector3 v0 = (targetPosition - startPosition.position - 0.5f * totalAcceleration * t * t) / t;
-
+        v0 += Vector3.down*1.01f;
         // Convert velocity to impulse
         return v0;
     }
